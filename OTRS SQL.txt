@@ -1,0 +1,273 @@
+Chamados novos
+---
+ select count(*) as cont from ticket where ticket_state_id = 1;
+---
+
+Chamados abertos
+---
+ select count(*) as cont from ticket where ticket_state_id in (1,4,11,12,13,14);
+--- 
+
+Chamados abrtos - turno tarde
+---
+ select count(*) as cont from dynamic_field_value where value_text = 'Tarde'; 
+---
+
+Chamados abertos - turno manhã
+---
+ select count(*) as cont from dynamic_field_value where value_text = 'Manha'; 
+---
+
+Chamados abertos por empresa 'x'
+---
+ select count(*) as cont from ticket where ticket_state_id in (1,4,11,12,13,14)  AND customer_id = 'G5';
+---
+
+Chamados por atendente
+---
+select
+ 
+  u.login,
+ 
+  count(t.id) Chamados
+
+from
+ 
+  ticket t,
+ 
+  queue q,
+ 
+  users u
+ 
+where
+ 
+  u.id = t.responsible_user_id and
+ 
+  q.id = t.queue_id and
+
+   t.ticket_state_id in (1,4,6,7,8) and
+ 
+  q.id in (5,6,7)
+
+group by u.login;
+---
+
+Serviços mais requisitados
+---
+select
+	sv.name as "SERVIÇO", 
+	count(t.id) as "TICKETS"
+from
+	ticket t,
+	queue q,
+	ticket_state ts,
+	service sv
+where
+	t.service_id = sv.id and
+	t.queue_id = q.id and
+	t.ticket_state_id = ts.id and
+	q.name <> 'Lixo' 
+group by
+	sv.name
+order by 
+	count(t.id) ASC;
+---
+
+Clientes que mais abriram chamados até o momento
+---
+select 
+	cc.name as CLIENTE, 
+	count(*) as TICKETS 
+from 
+	ticket t, 
+	queue q, 
+	ticket_state ts, 
+	customer_company cc 
+where 
+	cc.customer_id = t.customer_id and 
+	t.queue_id = q.id and 
+	t.ticket_state_id = ts.id and 
+	q.name <> 'Atendimento' 
+group by 
+	t.customer_id 
+order by 
+	TICKETS desc 
+limit 10;
+---
+Tamanho do banco em MB
+---
+SELECT table_schema "OTRS" , sum( data_length + index_length ) / 1024 / 1024 "Tamanho do BD em MB"
+FROM information_schema.TABLES  where table_schema = 'otrs'  ;
+---
+
+SLA VENCIDO
+---
+select
+ 
+	t.tn as TICKET,
+
+	t.title as TÍTULO,
+ 
+	s.name as SLA,
+ 
+	q.name as FILA,
+
+	t.create_time as ABERTURA,
+ 
+	subtime(from_unixtime(t.escalation_response_time),'15') as "PRAZO RESPOSTA",
+ 
+	sec_to_time(to_seconds(now())-to_seconds(from_unixtime(t.escalation_response_time))) as ATRASO
+
+from 
+
+	ticket t,
+ 
+	queue q,
+ 
+	ticket_state ts, 
+
+	sla s
+
+where
+ 
+	t.queue_id = q.id and
+ 
+	t.ticket_state_id = ts.id and
+
+	t.sla_id = s.id and
+ 
+	q.name <> 'Lixo' and
+ 
+	ts.id not in (2,3,10) and
+ 
+	from_unixtime(t.escalation_response_time) < NOW() and 
+	t.escalation_response_time > 0;  
+-----
+
+SLA A VENCER
+---
+select
+ 
+    t.customer_id as EMPRESA,
+
+    t.title as TÍTULO,
+
+    s.name as SLA,
+
+    sec_to_time(to_seconds(from_unixtime(t.escalation_response_time))-to_seconds(now())) as "TEMPO RESTANTE"
+
+from
+ 
+  ticket t,
+ 
+  queue q,
+ 
+  ticket_state ts,
+ 
+  sla s
+
+where
+  
+ 	t.queue_id = q.id and
+
+	t.ticket_state_id = ts.id and
+
+        t.sla_id = s.id and
+  
+        q.name != 'Lixo' and
+ 
+       ts.id not in (2,3,10);
+    
+---
+TABELA DE CHAMADOS ABERTOS POR EMPRESA 
+---
+select
+
+	cc.customer_id as "CLIENTE",
+ 
+	count(t.id) as "TICKETS"
+
+from
+
+	ticket t,
+
+	queue q,
+
+	ticket_state ts,
+
+	customer_company cc
+
+where
+
+	t.customer_id = cc.customer_id and
+
+	t.queue_id = q.id and
+
+	t.ticket_state_id = ts.id and
+
+	t.ticket_state_id in (1,4,11,12,13,14) and
+
+	q.name <> 'Lixo'
+group by
+
+	cc.customer_id
+
+order by 
+
+	TICKETS desc;
+---
+Agendamentos
+---
+select
+ 
+   title as TÍTULO,start_time as INÍCIO,end_time AS FIM
+ 
+from
+
+   calendar_appointment ca
+   where start_time >= now() ;
+--Assim que um agendamento chegar no dia e data atual ele some automatico da tabela
+
+----
+Chamados abertos por fila
+----
+select
+ 
+  count(tn) 
+
+from
+  ticket 
+
+where
+  ticket_state_id in (4,6,7,8) and
+  queue_id in (5);
+----
+
+Evolução de chamados por hora (TESTE)
+----
+SELECT
+
+   queue.name as metric,
+
+   count(tn) as value,
+
+   min(UNIX_TIMESTAMP(ticket.create_time)) as time_sec
+
+FROM
+   ticket,
+   queue
+
+WHERE
+   
+ticket.create_time>1483228800 and
+
+   ticket.queue_id = queue.id and
+
+   ticket.queue_id  in
+ (3,5,6,7,8)and
+   $__timeFilter(ticket.create_time)
+
+GROUP BY
+
+   metric,UNIX_TIMESTAMP(ticket.create_time) DIV 1800
+--
