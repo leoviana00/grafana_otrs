@@ -1,0 +1,1 @@
+select count(*) as cont from ticket where ticket_state_id = 1;
